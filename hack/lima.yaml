@@ -1,0 +1,37 @@
+images:
+  - location: https://cloud-images.ubuntu.com/releases/23.10/release-20231011/ubuntu-23.10-server-cloudimg-amd64.img
+    arch: x86_64
+    digest: sha256:f6529be56da3429a56e4f5ef202bf4958201bc63f8541e478caa6e8eb712e635
+  - location: https://cloud-images.ubuntu.com/releases/23.10/release-20231011/ubuntu-23.10-server-cloudimg-arm64.img
+    arch: aarch64
+    digest: sha256:78d35a2f551d281912ee7e5202660d94d713aa1b5de86a17e261328cc2f093d4
+  - location: https://cloud-images.ubuntu.com/releases/23.10/release/ubuntu-23.10-server-cloudimg-amd64.img
+    arch: x86_64
+  - location: https://cloud-images.ubuntu.com/releases/23.10/release/ubuntu-23.10-server-cloudimg-arm64.img
+    arch: aarch64
+
+mounts:
+  - location: "~"
+  - location: /tmp/lima
+    writable: true
+
+containerd:
+  system: true
+  user: false
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/sh
+      chmod 777 /run/containerd/containerd.sock
+
+portForwards:
+  - guestSocket: /run/containerd/containerd.sock
+    hostSocket: "{{.Dir}}/containerd.sock"
+#
+# To use Virtualization.framework (macOS)
+# vmType: vz
+# mountType: virtiofs
+# networks:
+#   - vzNAT: true
+#
