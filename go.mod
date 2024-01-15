@@ -3,6 +3,7 @@ module github.com/depot/orca
 go 1.21
 
 require (
+	github.com/cespare/xxhash v1.1.0
 	github.com/containerd/containerd v1.7.12
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 )
