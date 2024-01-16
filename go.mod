@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/cespare/xxhash v1.1.0
 	github.com/containerd/containerd v1.7.12
+	github.com/moby/patternmatcher v0.6.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 )
 
@@ -55,3 +56,5 @@ require (
 	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
+
+replace github.com/moby/patternmatcher v0.6.0 => github.com/goller/patternmatcher v0.0.0-20240116231243-d272f5b06ae2
