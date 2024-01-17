@@ -86,7 +86,7 @@ func (chunker *Chunker) Next() ([]byte, error) {
 	splitpoint := chunker.ultraCDC(data, length)
 	chunker.splitpoint = splitpoint
 
-	if splitpoint < chunker.options.MinChunkSize || splitpoint == length {
+	if splitpoint < chunker.options.MinChunkSize {
 		return data[:splitpoint], io.EOF
 	}
 
