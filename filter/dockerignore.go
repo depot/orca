@@ -1,11 +1,18 @@
 package filter
 
-import "github.com/moby/patternmatcher"
+import (
+	"os"
+	"strings"
+
+	"github.com/moby/patternmatcher"
+)
 
 var _ FileFilter = (*DockerIgnoreFilter)(nil)
 
 type DockerIgnoreFilter struct {
-	Patterns []*patternmatcher.Pattern
+	Patterns           []*patternmatcher.Pattern
+	HasExclusions      bool
+	OnlySimplePatterns bool
 }
 
 func NewDockerIgnoreFilter(patterns []string) (*DockerIgnoreFilter, error) {
@@ -14,8 +21,20 @@ func NewDockerIgnoreFilter(patterns []string) (*DockerIgnoreFilter, error) {
 		return nil, err
 	}
 
+	var hasExclusions bool
+	for _, p := range ps {
+		if p.Exclusion {
+			hasExclusions = true
+			break
+		}
+	}
+
+	onlySimplePatterns := len(ComplexPatterns(ps)) == 0
+
 	return &DockerIgnoreFilter{
-		Patterns: ps,
+		Patterns:           ps,
+		HasExclusions:      hasExclusions,
+		OnlySimplePatterns: onlySimplePatterns,
 	}, nil
 }
 
@@ -32,4 +51,21 @@ func (f *DockerIgnoreFilter) MatchedPatterns(patterns MatchedPatterns) []string 
 		}
 	}
 	return matched
+}
+
+// ComplexPatterns checks if all patterns are prefix patterns.
+func ComplexPatterns(patterns []*patternmatcher.Pattern) []*patternmatcher.Pattern {
+	patternChars := "*[]?^"
+	if os.PathSeparator != '\\' {
+		patternChars += `\`
+	}
+
+	var complexPatterns []*patternmatcher.Pattern
+
+	for _, p := range patterns {
+		if p.Exclusion && strings.ContainsAny(patternWithoutTrailingGlob(p), patternChars) {
+			complexPatterns = append(complexPatterns, p)
+		}
+	}
+	return complexPatterns
 }
