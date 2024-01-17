@@ -9,13 +9,13 @@ import (
 
 const (
 	// DefaultMinChunkSize is the default minimum chunk size.
-	DefaultMinChunkSize = 256 << 10 // 256 KiB
+	DefaultMinChunkSize = 2 << 10 // 2 KiB
 
 	// DefaultMaxChunkSize is the default maximum chunk size.
-	DefaultMaxChunkSize = 8 << 20 // 8 MiB
+	DefaultMaxChunkSize = 64 << 10 // 64 KiB
 
 	// DefaultNormalChunkSize is the default normal chunk size.
-	DefaultNormalChunkSize = 256<<10 + (8 << 10) // 256 KiB + 8 KiB
+	DefaultNormalChunkSize = 2<<10 + (8 << 10) // 10 KiB
 )
 
 // ChunkerOptions contains options for a chunker.
@@ -86,7 +86,7 @@ func (chunker *Chunker) Next() ([]byte, error) {
 	splitpoint := chunker.ultraCDC(data, length)
 	chunker.splitpoint = splitpoint
 
-	if splitpoint < chunker.options.MinChunkSize {
+	if splitpoint < chunker.options.MinChunkSize || splitpoint == length {
 		return data[:splitpoint], io.EOF
 	}
 
@@ -121,6 +121,7 @@ func (chunker *Chunker) WriteTo(writer io.Writer) (int64, error) {
 
 const (
 	pattern                    uint64 = 0xAAAAAAAAAAAAAAAA
+	bytePattern                int    = 0xAA
 	maskSmaller                uint64 = 0x2F
 	maskLarger                 uint64 = 0x2C
 	lowEntropyStringsThreshold uint32 = 64
@@ -131,7 +132,7 @@ const (
 func (chunker *Chunker) ultraCDC(data []byte, size int) int {
 	normalChunkSize := chunker.options.NormalChunkSize
 
-	if size <= chunker.options.MinChunkSize {
+	if size-8 <= chunker.options.MinChunkSize {
 		return size
 	}
 
@@ -154,6 +155,10 @@ func (chunker *Chunker) ultraCDC(data []byte, size int) int {
 			mask = maskLarger
 		}
 
+		if i+8 >= size {
+			break
+		}
+
 		inWindow := binary.LittleEndian.Uint64(data[i:])
 		if outWindow^inWindow == 0 {
 			count++
@@ -168,7 +173,8 @@ func (chunker *Chunker) ultraCDC(data []byte, size int) int {
 				}
 				inByte := data[i+j]
 				outByte := data[i+j-8]
-				distance = distance + uint64(hammingDistance[outByte][inByte])
+				distance += uint64(hammingDistance[bytePattern][outByte])
+				distance -= uint64(hammingDistance[bytePattern][inByte])
 			}
 			outWindow = inWindow
 		}
