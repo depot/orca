@@ -10,12 +10,12 @@ import (
 )
 
 func TestComplexPatterns(t *testing.T) {
-	complex, _ := patternmatcher.NewPatterns([]string{"!README.*"})
+	complex, _ := patternmatcher.NewPatterns([]string{"!README.*", "!**/*.ts", "!**/api-*"})
 	simple, _ := patternmatcher.NewPatterns([]string{"node_modules", "*.ts", "!LICENSE", "!src/*", "!src/**"})
 	dockerignore, _ := patternmatcher.NewPatterns(patterns())
 	node, _ := patternmatcher.NewPatterns(node_patterns())
 
-	if len(filter.ComplexPatterns(complex)) != 1 {
+	if len(filter.ComplexPatterns(complex)) != 3 {
 		t.Fatal("expected complex patterns to be complex")
 	}
 	if len(filter.ComplexPatterns(simple)) != 0 {

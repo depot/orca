@@ -7,26 +7,62 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
-	continuityapi "github.com/containerd/continuity/proto"
-	"github.com/moby/patternmatcher"
-	"golang.org/x/sys/unix"
+	"github.com/containerd/continuity"
 )
 
-func Walk(root string, dockerignore *DockerIgnoreFilter) (*continuityapi.Manifest, error) {
+var _ continuity.Context = (*DockerIgnoreContext)(nil)
+
+// DockerIgnoreContext is a continuity.Context that filters resources based on a .dockerignore file.
+type DockerIgnoreContext struct {
+	root         string
+	dockerignore *DockerIgnoreFilter
+	inner        continuity.Context
+}
+
+func NewDockerIgnoreContext(root string, dockerignore *DockerIgnoreFilter, opts continuity.ContextOptions) (*DockerIgnoreContext, error) {
+	inner, err := continuity.NewContextWithOptions(root, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DockerIgnoreContext{
+		root:         root,
+		dockerignore: dockerignore,
+		inner:        inner,
+	}, nil
+}
+
+func (c *DockerIgnoreContext) Apply(r continuity.Resource) error  { return c.inner.Apply(r) }
+func (c *DockerIgnoreContext) Verify(r continuity.Resource) error { return c.inner.Verify(r) }
+func (c *DockerIgnoreContext) Resource(p string, fi os.FileInfo) (continuity.Resource, error) {
+	return c.inner.Resource(p, fi)
+}
+
+func (c *DockerIgnoreContext) Walk(walkFn filepath.WalkFunc) error {
 	var (
-		parentDirs  []visitedDir
-		pathMatches []match
+		parentDirs []visitedDir
 	)
 
-	filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	// This is transliterated from buildkit. It can generate more than one match per match
+	// as parent directories are potentially revisited. This means it has an _assumption_
+	// that any state that is tracked per match is inserted into maps to ensure uniqueness.
+	walk := func(walkPath string, info fs.FileInfo, walkErr error) error {
+		path, err := filepath.Rel(c.root, filepath.Join(c.root, walkPath))
+		if err != nil {
+			return err
+		}
+		// Skip root
+		if path == "." {
+			return nil
+		}
+
 		skip := false
 		var parentExcludeMatchInfo []bool
 		if len(parentDirs) != 0 {
 			parentExcludeMatchInfo = parentDirs[len(parentDirs)-1].excludeMatchInfo
 		}
-		matches, matchInfo, err := dockerignore.Matches(path, parentExcludeMatchInfo)
+		matches, matchInfo, err := c.dockerignore.Matches(path, parentExcludeMatchInfo)
 		if err != nil {
 			return fmt.Errorf("failed to match patterns: %w", err)
 		}
@@ -40,27 +76,28 @@ func Walk(root string, dockerignore *DockerIgnoreFilter) (*continuityapi.Manifes
 		}
 
 		var dir visitedDir
-		isDir := entry != nil && entry.IsDir()
+		isDir := info != nil && info.IsDir()
 		if isDir {
 			dir = visitedDir{
-				entry:            entry,
+				info:             info,
 				path:             path,
+				walkPath:         walkPath,
 				pathWithSep:      path + string(filepath.Separator),
 				excludeMatchInfo: matchInfo,
 			}
 		}
 
 		if matches {
-			if isDir && dockerignore.OnlySimplePatterns {
+			if isDir && c.dockerignore.OnlySimplePatterns {
 				// Optimization: we can skip walking this dir if no
 				// exceptions to exclude patterns could match anything
 				// inside it.
-				if !dockerignore.HasExclusions {
+				if !c.dockerignore.HasExclusions {
 					return filepath.SkipDir
 				}
 
 				dirSlash := path + string(filepath.Separator)
-				for _, pat := range dockerignore.Patterns {
+				for _, pat := range c.dockerignore.Patterns {
 					if !pat.Exclusion {
 						continue
 					}
@@ -90,80 +127,31 @@ func Walk(root string, dockerignore *DockerIgnoreFilter) (*continuityapi.Manifes
 			return nil
 		}
 
+		// This revisits all parent directories just so that exclusions with ignored parent directories
+		// have their parent directories included in the manifest.
 		for i, parentDir := range parentDirs {
 			if parentDir.visited {
 				continue
 			}
 
-			pathMatches = append(pathMatches, match{
-				Path:  parentDir.path,
-				Entry: parentDir.entry,
-			})
+			err := walkFn(parentDir.walkPath, parentDir.info, nil)
+			if err != nil {
+				return err
+			}
 
 			parentDirs[i].visited = true
 		}
 
-		pathMatches = append(pathMatches, match{
-			Path:  path,
-			Entry: entry,
-		})
-
-		return nil
-	})
-
-	resources := make([]*continuityapi.Resource, 0, len(pathMatches))
-	for _, match := range pathMatches {
-		info, err := match.Entry.Info()
-		if err != nil {
-			continue
-		}
-
-		resource := &continuityapi.Resource{
-			Path: []string{match.Path},
-
-			Size: uint64(info.Size()),
-			// TODO: Handle symlinks
-			// Target:
-
-			Mode: uint32(info.Mode()),
-		}
-
-		if s, ok := info.Sys().(*syscall.Stat_t); ok {
-			resource.Uid = int64(s.Uid)
-			resource.Gid = int64(s.Gid)
-			resource.Major = uint64(unix.Major(uint64(s.Rdev)))
-			resource.Minor = uint64(unix.Minor(uint64(s.Rdev)))
-		}
-
-		// TODO: xattrs
-		// TODO: windows ads
-
-		resources = append(resources, resource)
+		return walkFn(walkPath, info, nil)
 	}
 
-	return &continuityapi.Manifest{
-		Resource: resources,
-	}, nil
-}
-
-func patternWithoutTrailingGlob(pattern *patternmatcher.Pattern) string {
-	patStr := pattern.CleanedPattern
-	// We use filepath.Separator here because patternmatcher.Pattern patterns
-	// get transformed to use the native path separator:
-	// https://github.com/moby/patternmatcher/blob/130b41bafc16209dc1b52a103fdac1decad04f1a/patternmatcher.go#L52
-	patStr = strings.TrimSuffix(patStr, string(filepath.Separator)+"**")
-	patStr = strings.TrimSuffix(patStr, string(filepath.Separator)+"*")
-	return patStr
-}
-
-type match struct {
-	Path  string
-	Entry fs.DirEntry
+	return c.inner.Walk(walk)
 }
 
 type visitedDir struct {
-	entry            fs.DirEntry
+	info             os.FileInfo
 	path             string
+	walkPath         string
 	pathWithSep      string
 	excludeMatchInfo []bool
 	visited          bool

@@ -2,12 +2,14 @@ package filter
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/moby/patternmatcher"
 )
 
-var _ FileFilter = (*DockerIgnoreFilter)(nil)
+// MatchIndices is a slice of booleans that indicate which patterns matched the path.
+type MatchedPatterns []bool
 
 type DockerIgnoreFilter struct {
 	Patterns           []*patternmatcher.Pattern
@@ -43,16 +45,6 @@ func (f *DockerIgnoreFilter) Matches(path string, parentPathMatches MatchedPatte
 	return
 }
 
-func (f *DockerIgnoreFilter) MatchedPatterns(patterns MatchedPatterns) []string {
-	matched := make([]string, 0, len(patterns))
-	for i, p := range patterns {
-		if p {
-			matched = append(matched, f.Patterns[i].CleanedPattern)
-		}
-	}
-	return matched
-}
-
 // ComplexPatterns checks if all patterns are prefix patterns.
 func ComplexPatterns(patterns []*patternmatcher.Pattern) []*patternmatcher.Pattern {
 	patternChars := "*[]?^"
@@ -68,4 +60,14 @@ func ComplexPatterns(patterns []*patternmatcher.Pattern) []*patternmatcher.Patte
 		}
 	}
 	return complexPatterns
+}
+
+func patternWithoutTrailingGlob(pattern *patternmatcher.Pattern) string {
+	patStr := pattern.CleanedPattern
+	// We use filepath.Separator here because patternmatcher.Pattern patterns
+	// get transformed to use the native path separator:
+	// https://github.com/moby/patternmatcher/blob/130b41bafc16209dc1b52a103fdac1decad04f1a/patternmatcher.go#L52
+	patStr = strings.TrimSuffix(patStr, string(filepath.Separator)+"**")
+	patStr = strings.TrimSuffix(patStr, string(filepath.Separator)+"*")
+	return patStr
 }
