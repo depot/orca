@@ -13,13 +13,14 @@ import (
 
 var _ continuity.Context = (*DockerIgnoreContext)(nil)
 
-// DockerIgnoreContext is a continuity.Context that filters resources based on a .dockerignore file.
+// DockerIgnoreContext wrap a continuity.Context that filters resources based on a .dockerignore file.
 type DockerIgnoreContext struct {
 	root         string
 	dockerignore *DockerIgnoreFilter
 	inner        continuity.Context
 }
 
+// NewDockerIgnoreContext creates a new DockerIgnoreContext with a dockerignore filter.
 func NewDockerIgnoreContext(root string, dockerignore *DockerIgnoreFilter, opts continuity.ContextOptions) (*DockerIgnoreContext, error) {
 	inner, err := continuity.NewContextWithOptions(root, opts)
 	if err != nil {
@@ -33,13 +34,32 @@ func NewDockerIgnoreContext(root string, dockerignore *DockerIgnoreFilter, opts 
 	}, nil
 }
 
-func (c *DockerIgnoreContext) Apply(r continuity.Resource) error  { return c.inner.Apply(r) }
+// Apply passes through to the inner context.
+func (c *DockerIgnoreContext) Apply(r continuity.Resource) error { return c.inner.Apply(r) }
+
+// Verify passes through to the inner context.
 func (c *DockerIgnoreContext) Verify(r continuity.Resource) error { return c.inner.Verify(r) }
+
+// Resource passes through to the inner context.
 func (c *DockerIgnoreContext) Resource(p string, fi os.FileInfo) (continuity.Resource, error) {
 	return c.inner.Resource(p, fi)
 }
 
+// Walk applies a dockerignore to filter files from a directory tree.
+// Files that are not filtered by the dockerignore are passed through to the inner context.
+//
+// This was transliterated from buildkit. It has *BIG* assumption that it is ok for the same
+// directory to be visited multiple times.
 func (c *DockerIgnoreContext) Walk(walkFn filepath.WalkFunc) error {
+	type visitedDir struct {
+		info             os.FileInfo
+		path             string
+		walkPath         string
+		pathWithSep      string
+		excludeMatchInfo []bool
+		visited          bool
+	}
+
 	var (
 		parentDirs []visitedDir
 	)
@@ -146,13 +166,4 @@ func (c *DockerIgnoreContext) Walk(walkFn filepath.WalkFunc) error {
 	}
 
 	return c.inner.Walk(walk)
-}
-
-type visitedDir struct {
-	info             os.FileInfo
-	path             string
-	walkPath         string
-	pathWithSep      string
-	excludeMatchInfo []bool
-	visited          bool
 }

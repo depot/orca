@@ -11,6 +11,9 @@ import (
 // MatchIndices is a slice of booleans that indicate which patterns matched the path.
 type MatchedPatterns []bool
 
+// DockerIgnoreFilter is a filter that uses dockerignore rules  to filter files from a directory tree.
+//
+// This is largely transliterated from buildkit.
 type DockerIgnoreFilter struct {
 	Patterns           []*patternmatcher.Pattern
 	HasExclusions      bool
@@ -40,6 +43,7 @@ func NewDockerIgnoreFilter(patterns []string) (*DockerIgnoreFilter, error) {
 	}, nil
 }
 
+// Matches checks if the path matches the dockerignore patterns.
 func (f *DockerIgnoreFilter) Matches(path string, parentPathMatches MatchedPatterns) (ok bool, patterns MatchedPatterns, err error) {
 	ok, patterns, err = patternmatcher.MatchesUsingParentResults(f.Patterns, path, parentPathMatches)
 	return
