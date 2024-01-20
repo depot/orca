@@ -23,13 +23,13 @@ func (d *Digester) Digest(r io.Reader) (digest.Digest, error) {
 		if err != nil && err != io.EOF {
 			return "", err
 		}
-		if err == io.EOF {
-			break
-		}
 
 		hash := xxhash.Sum64(data)
 		chunk := chunk.NewChunk(len(data), hash)
 		chunks = append(chunks, chunk)
+		if err == io.EOF {
+			break
+		}
 	}
 
 	return digest.Digest(chunks.String()), nil
