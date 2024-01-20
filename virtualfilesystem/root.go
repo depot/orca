@@ -69,47 +69,6 @@ func (r *virtualFilesystemRoot) OnAdd(ctx context.Context) {
 			parent.AddChild(base, inode, false)
 		}
 	}
-
-	ch := r.NewPersistentInode(
-		ctx, &fs.MemRegularFile{
-			Data: []byte("file.txt"),
-			Attr: fuse.Attr{
-				Mode: 0644,
-			},
-		}, fs.StableAttr{Ino: 2})
-	r.AddChild("file.txt", ch, false)
-
-	r.AddChild("hello.txt", r.NewPersistentInode(
-		ctx, &virtualFile{
-			size: 12,
-			chunks: []chunk{
-				{size: 6, location: "/mnt/hello"},
-				{size: 6, location: "/mnt/world"},
-			},
-			Attr: fuse.Attr{
-				Mode: 0644,
-			},
-		}, fs.StableAttr{Ino: 3}), false)
-
-	dir := &fs.MemRegularFile{
-		Attr: fuse.Attr{
-			Mode: 0755,
-		},
-	}
-	r.AddChild("hello", r.NewPersistentInode(
-		ctx, dir, fs.StableAttr{Ino: 4, Mode: fuse.S_IFDIR}), false)
-
-	dir.AddChild("hello.txt", r.NewPersistentInode(
-		ctx, &virtualFile{
-			size: 12,
-			chunks: []chunk{
-				{size: 6, location: "/mnt/hello"},
-				{size: 6, location: "/mnt/world"},
-			},
-			Attr: fuse.Attr{
-				Mode: 0644,
-			},
-		}, fs.StableAttr{Ino: 4}), false)
 }
 
 func (r *virtualFilesystemRoot) Getattr(ctx context.Context, fh fs.FileHandle, out *fuse.AttrOut) syscall.Errno {
