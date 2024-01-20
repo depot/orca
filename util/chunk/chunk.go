@@ -17,6 +17,13 @@ type Chunk struct {
 	Hash uint64
 }
 
+func NewChunk(size int, hash uint64) Chunk {
+	return Chunk{
+		Size: uint32(size),
+		Hash: hash,
+	}
+}
+
 var _ fmt.Stringer = (*Chunk)(nil)
 var _ encoding.BinaryMarshaler = (*Chunk)(nil)
 var _ encoding.BinaryUnmarshaler = (*Chunk)(nil)
