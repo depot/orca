@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/depot/orca/resolvconf"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseFile(t *testing.T) {
@@ -28,7 +29,7 @@ func TestParseFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertEqual(t, conf, conf2)
+	assert.Equal(t, conf, conf2)
 }
 
 func TestParse(t *testing.T) {
@@ -50,7 +51,7 @@ func TestParse(t *testing.T) {
 		},
 	}
 
-	assertEqual(t, expected, actual)
+	assert.Equal(t, expected, actual)
 
 	tailscaleResolvConf := `search taila12bc.ts.net taild34ef.ts.net
 	nameserver 100.100.100.100`
@@ -70,7 +71,7 @@ func TestParse(t *testing.T) {
 		},
 	}
 
-	assertEqual(t, expected, actual)
+	assert.Equal(t, expected, actual)
 }
 
 func TestFromHost(t *testing.T) {
@@ -138,37 +139,5 @@ func TestFromHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertEqual(t, systemdResolvConf, actual)
-}
-
-func assertEqual(t *testing.T, conf *resolvconf.Config, conf2 *resolvconf.Config) {
-	if len(conf2.Nameservers) != len(conf.Nameservers) {
-		t.Fatalf("expected %d nameservers, got %d", len(conf.Nameservers), len(conf2.Nameservers))
-	}
-
-	for i, ns := range conf.Nameservers {
-		if ns.String() != conf2.Nameservers[i].String() {
-			t.Fatalf("expected nameserver %d to be %s, got %s", i, ns.String(), conf2.Nameservers[i].String())
-		}
-	}
-
-	if len(conf2.SearchDomains) != len(conf.SearchDomains) {
-		t.Fatalf("expected %d search domains, got %d", len(conf.SearchDomains), len(conf2.SearchDomains))
-	}
-
-	for i, sd := range conf.SearchDomains {
-		if sd != conf2.SearchDomains[i] {
-			t.Fatalf("expected search domain %d to be %s, got %s", i, sd, conf2.SearchDomains[i])
-		}
-	}
-
-	if len(conf2.Options) != len(conf.Options) {
-		t.Fatalf("expected %d options, got %d", len(conf.Options), len(conf2.Options))
-	}
-
-	for i, o := range conf.Options {
-		if o != conf2.Options[i] {
-			t.Fatalf("expected option %d to be %s, got %s", i, o, conf2.Options[i])
-		}
-	}
+	assert.Equal(t, systemdResolvConf, actual)
 }
