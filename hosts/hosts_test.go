@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/depot/orca/hosts"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParse(t *testing.T) {
@@ -62,7 +63,8 @@ fe80::1%lo0	localhost
 			},
 		},
 	}
-	assertEqual(t, expected, actual)
+
+	assert.Equal(t, expected, actual)
 }
 
 func TestWrite(t *testing.T) {
@@ -155,7 +157,7 @@ func TestFromHost(t *testing.T) {
 		},
 	}
 
-	assertEqual(t, expected, actual)
+	assert.Equal(t, expected, actual)
 }
 
 func TestWriteEtcHosts(t *testing.T) {
@@ -180,7 +182,7 @@ func TestWriteEtcHosts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertEqual(t, hs, hs2)
+	assert.Equal(t, hs, hs2)
 }
 
 func TestDefault(t *testing.T) {
@@ -198,24 +200,5 @@ func TestDefault(t *testing.T) {
 
 	if actual != expected {
 		t.Errorf("expected %s, got %s", expected, actual)
-	}
-}
-
-func assertEqual(t *testing.T, expected *hosts.Hosts, actual *hosts.Hosts) {
-	if len(actual.Entries) != len(expected.Entries) {
-		t.Fatalf("expected %d entries, got %d", len(expected.Entries), len(actual.Entries))
-	}
-	for i := range expected.Entries {
-		if actual.Entries[i].Addr != expected.Entries[i].Addr {
-			t.Errorf("expected addr %s, got %s", expected.Entries[i].Addr, actual.Entries[i].Addr)
-		}
-		if len(actual.Entries[i].Hosts) != len(expected.Entries[i].Hosts) {
-			t.Errorf("expected %d hosts, got %d", len(expected.Entries[i].Hosts), len(actual.Entries[i].Hosts))
-		}
-		for j := range expected.Entries[i].Hosts {
-			if actual.Entries[i].Hosts[j] != expected.Entries[i].Hosts[j] {
-				t.Errorf("expected host %s, got %s", expected.Entries[i].Hosts[j], actual.Entries[i].Hosts[j])
-			}
-		}
 	}
 }
